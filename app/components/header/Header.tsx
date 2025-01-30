@@ -1,16 +1,30 @@
 import { useStore } from '@nanostores/react';
 import { ClientOnly } from 'remix-utils/client-only';
 import { chatStore } from '~/lib/stores/chat';
+import { createClient } from '@supabase/supabase-js';
 import { classNames } from '~/utils/classNames';
 import { HeaderActionButtons } from './HeaderActionButtons.client';
 import { ChatDescription } from '~/lib/persistence/ChatDescription.client';
 
+const supabase = createClient(
+  'https://vwzbimkcpcctewshmtdc.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3emJpbWtjcGNjdGV3c2htdGRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcxMTIwMTAsImV4cCI6MjA1MjY4ODAxMH0.nwuRmvPOV-4b0lXPHZ4g54zQHZ7gYKCGbO7uw0T0AYk',
+);
+
 export function Header() {
   const chat = useStore(chatStore);
 
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   return (
     <header
-      className={classNames('flex items-center p-5 border-b h-[var(--header-height)]', {
+      className={classNames('flex items-center justify-between p-5 border-b h-[var(--header-height)]', {
         'border-transparent': !chat.started,
         'border-bolt-elements-borderColor': chat.started,
       })}
@@ -37,6 +51,12 @@ export function Header() {
           </ClientOnly>
         </>
       )}
+      <div
+        className="bg-green border border-bolt-elements-borderColor rounded cursor-pointer color-white px-4 py-1"
+        onClick={handleSignOut}
+      >
+        Sign out
+      </div>
     </header>
   );
 }
