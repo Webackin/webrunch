@@ -1,5 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { ClientOnly } from 'remix-utils/client-only';
+import { useClerk } from '@clerk/clerk-react';
+
 import { chatStore } from '~/lib/stores/chat';
 import { classNames } from '~/utils/classNames';
 import { HeaderActionButtons } from './HeaderActionButtons.client';
@@ -7,10 +9,11 @@ import { ChatDescription } from '~/lib/persistence/ChatDescription.client';
 
 export function Header() {
   const chat = useStore(chatStore);
+  const { signOut } = useClerk();
 
   return (
     <header
-      className={classNames('flex items-center p-5 border-b h-[var(--header-height)]', {
+      className={classNames('flex items-center justify-between p-5 border-b h-[var(--header-height)]', {
         'border-transparent': !chat.started,
         'border-bolt-elements-borderColor': chat.started,
       })}
@@ -37,6 +40,12 @@ export function Header() {
           </ClientOnly>
         </>
       )}
+      <div
+        className="bg-green border border-bolt-elements-borderColor rounded cursor-pointer color-white px-4 py-1"
+        onClick={() => signOut({ redirectUrl: '/' })}
+      >
+        Sign Out
+      </div>
     </header>
   );
 }

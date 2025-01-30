@@ -6,6 +6,7 @@ import { themeStore } from './lib/stores/theme';
 import { stripIndents } from './utils/stripIndent';
 import { createHead } from 'remix-island';
 import { useEffect } from 'react';
+import { ClerkProvider } from '@clerk/clerk-react';
 
 import reactToastifyStyles from 'react-toastify/dist/ReactToastify.css?url';
 import globalStyles from './styles/index.scss?url';
@@ -82,6 +83,11 @@ import { logStore } from './lib/stores/logs';
 
 export default function App() {
   const theme = useStore(themeStore);
+  const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+  if (!PUBLISHABLE_KEY) {
+    throw new Error('Missing Publishable Key');
+  }
 
   useEffect(() => {
     logStore.logSystem('Application initialized', {
@@ -93,8 +99,10 @@ export default function App() {
   }, []);
 
   return (
-    <Layout>
-      <Outlet />
-    </Layout>
+    <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
+      <Layout>
+        <Outlet />
+      </Layout>
+    </ClerkProvider>
   );
 }
