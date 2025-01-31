@@ -340,12 +340,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 <div
                   className={classNames(
                     'bg-bolt-elements-background-depth-2 p-3 rounded-lg border border-bolt-elements-borderColor relative w-full max-w-chat mx-auto z-prompt',
-
-                    /*
-                     * {
-                     *   'sticky bottom-2': chatStarted,
-                     * },
-                     */
                   )}
                 >
                   <svg className={classNames(styles.PromptEffectContainer)}>
@@ -359,10 +353,10 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                         gradientUnits="userSpaceOnUse"
                         gradientTransform="rotate(-45)"
                       >
-                        <stop offset="0%" stopColor="#b44aff" stopOpacity="0%"></stop>
-                        <stop offset="40%" stopColor="#b44aff" stopOpacity="80%"></stop>
-                        <stop offset="50%" stopColor="#b44aff" stopOpacity="80%"></stop>
-                        <stop offset="100%" stopColor="#b44aff" stopOpacity="0%"></stop>
+                        <stop offset="0%" stopColor="#B6794F" stopOpacity="0%"></stop>
+                        <stop offset="40%" stopColor="#B6794F" stopOpacity="80%"></stop>
+                        <stop offset="50%" stopColor="#B6794F" stopOpacity="80%"></stop>
+                        <stop offset="100%" stopColor="#B6794F" stopOpacity="0%"></stop>
                       </linearGradient>
                       <linearGradient id="shine-gradient">
                         <stop offset="0%" stopColor="white" stopOpacity="0%"></stop>
