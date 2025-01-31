@@ -47,7 +47,7 @@ export default function FeaturesTab() {
             <div>
               <span className="text-bolt-elements-textPrimary">Auto Select Code Template</span>
               <p className="text-xs text-bolt-elements-textTertiary">
-                Let Bolt select the best starter template for your project.
+                Let Webrunch select the best starter template for your project.
               </p>
             </div>
             <Switch className="ml-auto" checked={autoSelectTemplate} onCheckedChange={setAutoSelectTemplate} />
