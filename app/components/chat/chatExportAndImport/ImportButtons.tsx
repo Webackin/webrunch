@@ -3,7 +3,7 @@ import { toast } from 'react-toastify';
 import { ImportFolderButton } from '~/components/chat/ImportFolderButton';
 
 type ChatData = {
-  messages?: Message[]; // Standard Bolt format
+  messages?: Message[]; // Standard Webrunch format
   description?: string; // Optional description
 };
 
