@@ -562,17 +562,19 @@ export class WorkbenchStore {
     }
   }
 
-  async pullFromGitHub(chatId: string, githubUsername?: string, ghToken?: string) {
+  async pullFromGitHub(
+    chatId: string,
+    githubUsername?: string,
+    ghToken?: string,
+  ): Promise<{ repoFiles?: FileMap; error?: string }> {
     try {
       if (!db) {
         toast.error('Chat persistence is not available');
-        return;
+        return { error: 'Chat persistence is not available' };
       }
 
-      // Get chat details
       const chat = await getMessages(db, chatId);
 
-      // Use cookies if username and token are not provided
       const githubToken = ghToken || Cookies.get('githubToken');
       const owner = githubUsername || Cookies.get('githubUsername');
 
@@ -580,13 +582,11 @@ export class WorkbenchStore {
         throw new Error('GitHub token or username is not set in cookies or provided.');
       }
 
-      // Initialize Octokit with the auth token
       const octokit = new Octokit({ auth: githubToken });
 
-      // Helper function to fetch repository contents
       const fetchRepoContents = async (path = '') => {
         if (!chat.gitHubRepo) {
-          throw new Error('GitHub repository is not set in cookies or provided.');
+          throw new Error('GitHub repository is not set.');
         }
 
         const { data } = await octokit.repos.getContent({
@@ -595,39 +595,23 @@ export class WorkbenchStore {
           path,
         });
 
-        return Array.isArray(data) ? data : [data]; // Normalize single file or folder response
+        return Array.isArray(data) ? data : [data];
       };
 
-      // Helper function to determine if a file is binary
       const isBinaryFile = (content: string): boolean => {
         try {
-          return /[^\x09\x0A\x0D\x20-\x7E]/.test(atob(content)); // Check for non-printable characters
+          return /[^\x09\x0A\x0D\x20-\x7E]/.test(atob(content));
         } catch {
-          // If decoding fails, assume binary
           return true;
         }
       };
-
-      // Helper function to fetch file content safely
-      const fetchFileContent = async (url: string): Promise<string> => {
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch file content: ${response.statusText}`);
-        }
-
-        return await response.text();
-      };
-
-      // Helper function to safely fetch large files
-      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
       const fetchFileContentSafely = async (url: string): Promise<string> => {
         const response = await fetch(url);
 
         if (
           response.headers.get('content-length') &&
-          parseInt(response.headers.get('content-length')!, 10) > MAX_FILE_SIZE
+          parseInt(response.headers.get('content-length')!, 10) > 5 * 1024 * 1024
         ) {
           throw new Error('File size exceeds limit');
         }
@@ -635,56 +619,39 @@ export class WorkbenchStore {
         return await response.text();
       };
 
-      // Recursively fetch files and folders
       const fetchAllFiles = async (path = ''): Promise<FileMap> => {
         const files: FileMap = {};
         const contents = await fetchRepoContents(path);
 
         for (const item of contents) {
-          if (item.type === 'file') {
-            const isReadme = item.path.toLowerCase().startsWith('readme');
-
-            if (item.download_url) {
-              const fileContent = isReadme
-                ? await fetchFileContent(item.download_url)
-                : await fetchFileContentSafely(item.download_url);
-
-              const isBinary = isReadme ? false : isBinaryFile(fileContent);
-
-              files[item.path] = {
-                type: 'file',
-                content: fileContent,
-                isBinary,
-              };
-            } else {
-              console.warn(`Download URL is null for item: ${item.path}`);
-            }
+          if (item.type === 'file' && item.download_url) {
+            const fileContent = await fetchFileContentSafely(item.download_url);
+            files[item.path] = {
+              type: 'file',
+              content: fileContent,
+              isBinary: isBinaryFile(fileContent),
+            };
           } else if (item.type === 'dir') {
-            files[item.path] = { type: 'folder' }; // Add folder to FileMap
-
-            const subFiles = await fetchAllFiles(item.path); // Recurse into the folder
-            Object.assign(files, subFiles);
+            files[item.path] = { type: 'folder' };
+            Object.assign(files, await fetchAllFiles(item.path));
           }
         }
 
         return files;
       };
 
-      // Fetch all files starting from the root directory
-      const repoFiles: FileMap = await fetchAllFiles();
+      const repoFiles = await fetchAllFiles();
 
       if (Object.keys(repoFiles).length === 0) {
         throw new Error('No files found in the repository');
       }
 
-      // Store the files in your local storage or database
-      this.files.set(repoFiles);
-
-      toast.success('Repository files have been pulled successfully!');
+      return { repoFiles };
     } catch (error: any) {
       console.error('Error pulling from GitHub:', error);
       toast.error(`Error: ${error.message}`);
-      throw error; // Rethrow the error for further handling
+
+      return { error: error.message }; // Always return something
     }
   }
 }

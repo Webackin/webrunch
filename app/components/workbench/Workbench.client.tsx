@@ -18,7 +18,12 @@ import { EditorPanel } from './EditorPanel';
 import { Preview } from './Preview';
 import useViewport from '~/lib/hooks';
 import Cookies from 'js-cookie';
-import { chatId as chatIdStore, db, updateChatGitHubRepository } from '~/lib/persistence';
+import { chatId as chatIdStore, db, getMessages, setMessages, updateChatGitHubRepository } from '~/lib/persistence';
+import { createCommandsMessage, detectProjectCommands } from '~/utils/projectCommands';
+import { generateId } from '~/utils/fileUtils';
+import type { Message } from 'ai';
+import type { FileMap } from '~/lib/stores/files';
+import { webcontainer } from '~/lib/webcontainer';
 
 interface WorkspaceProps {
   chatStarted?: boolean;
@@ -133,27 +138,27 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
     }
   }, []);
 
+  const getCredentials = (): { username: string; token: string } | null => {
+    const githubUsername = Cookies.get('githubUsername');
+    const githubToken = Cookies.get('githubToken');
+
+    if (githubUsername && githubToken) {
+      return { username: githubUsername, token: githubToken };
+    }
+
+    const username = prompt('Please enter your GitHub username:') || '';
+    const token = prompt('Please enter your GitHub personal access token:') || '';
+
+    if (!username || !token) {
+      alert('GitHub username and token are required. Push to GitHub cancelled.');
+      return null;
+    }
+
+    return { username, token };
+  };
+
   const handlePushToGitHub = useCallback(
     async (db: IDBDatabase, id: string) => {
-      const getCredentials = (): { username: string; token: string } | null => {
-        const githubUsername = Cookies.get('githubUsername');
-        const githubToken = Cookies.get('githubToken');
-
-        if (githubUsername && githubToken) {
-          return { username: githubUsername, token: githubToken };
-        }
-
-        const username = prompt('Please enter your GitHub username:') || '';
-        const token = prompt('Please enter your GitHub personal access token:') || '';
-
-        if (!username || !token) {
-          alert('GitHub username and token are required. Push to GitHub cancelled.');
-          return null;
-        }
-
-        return { username, token };
-      };
-
       const getCommitMessage = (): string | null => {
         const commitMessage = prompt('Please enter your commit message:');
 
@@ -167,11 +172,16 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
 
       try {
         setIsPushing(true); // Start pushing immediately
-        await updateChatGitHubRepository(db, id);
 
         const credentials = getCredentials();
 
         if (!credentials) {
+          return;
+        }
+
+        const repoName = await updateChatGitHubRepository(db, id);
+
+        if (!repoName) {
           return;
         }
 
@@ -216,6 +226,19 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
         return { username, token };
       };
 
+      function transformFilesResponse(response: FileMap): { path: string; content: string }[] {
+        return Object.entries(response)
+          .filter(
+            ([, value]) =>
+              (value as { type: 'file'; content: string })?.type === 'file' &&
+              typeof (value as { content: string }).content === 'string',
+          )
+          .map(([path, value]) => ({
+            path,
+            content: (value as { content: string }).content,
+          }));
+      }
+
       try {
         setIsPulling(true); // Start pulling immediately
         await updateChatGitHubRepository(db, id);
@@ -226,7 +249,52 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
           return;
         }
 
-        await workbenchStore.pullFromGitHub(id, credentials.username, credentials.token);
+        const { repoFiles } = await workbenchStore.pullFromGitHub(id, credentials.username, credentials.token);
+
+        if (!repoFiles) {
+          return;
+        }
+
+        const fileContents = transformFilesResponse(repoFiles);
+
+        const commands = await detectProjectCommands(fileContents);
+        const commandsMessage = createCommandsMessage(commands);
+
+        const chat = await getMessages(db, id);
+
+        console.log('webcontainer: ', webcontainer);
+
+        const filesMessage: Message = {
+          role: 'assistant',
+          content: `Pulling the repo ${chat?.gitHubRepo} into
+        <boltArtifact id="imported-files" title="Git Pulled Files" type="bundled">
+        ${fileContents
+          .map(
+            (file) =>
+              `<boltAction type="file" filePath="${file.path}">
+        ${file.content}
+        </boltAction>`,
+          )
+          .join('\n')}
+        </boltArtifact>`,
+          id: generateId(),
+          createdAt: new Date(),
+        };
+
+        const messages = [filesMessage];
+
+        if (commandsMessage) {
+          messages.push(commandsMessage);
+        }
+
+        // Append new messages to existing chat messages
+        const updatedMessages = [...chat.messages, ...messages];
+
+        await setMessages(db, id, updatedMessages, chat.urlId, chat.description, chat?.gitHubRepo);
+
+        window.location.reload();
+
+        // await importChat(`Git Project:`, messages);
 
         toast.success('Successfully pulled from GitHub');
       } catch (error) {
@@ -303,7 +371,7 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
                           return;
                         }
 
-                        // Push changes to github repository
+                        // Pull changes from github repository
                         handlePullFromGitHub(db, chatId);
                       }}
                     >

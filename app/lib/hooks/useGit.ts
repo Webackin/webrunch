@@ -163,64 +163,75 @@ export function useGit() {
     [webcontainer, fs, ready],
   );
 
-  const gitPull = useCallback(
-    async (url: string, branch: string = 'main') => {
-      if (!webcontainer || !fs || !ready) {
-        throw 'Webcontainer not initialized';
-      }
+  const gitPull = useCallback(async () => {
+    if (!webcontainer || !fs || !ready) {
+      throw 'Webcontainer not initialized';
+    }
 
-      fileData.current = {};
+    console.log('Webcontainer: ', webcontainer);
 
-      try {
-        // Perform a pull operation
-        await git.pull({
-          fs,
-          http,
-          dir: webcontainer.workdir,
-          url,
-          ref: branch,
-          singleBranch: true,
-          fastForwardOnly: true,
-          corsProxy: 'https://cors.isomorphic-git.org',
-          onAuth: (url) => {
-            let auth = lookupSavedPassword(url);
+    const headers: { [x: string]: string } = {
+      'User-Agent': 'bolt.diy',
+    };
 
-            if (auth) {
-              return auth;
-            }
+    const remoteUrl = await git.getConfig({
+      fs,
+      dir: webcontainer.workdir,
+      path: 'remote.origin.url',
+    });
 
-            if (confirm('This repo is password protected. Ready to enter a username & password?')) {
-              auth = {
-                username: prompt('Enter username'),
-                password: prompt('Enter password'),
-              };
-              return auth;
-            } else {
-              return { cancel: true };
-            }
-          },
-          onAuthFailure: (url, _auth) => {
-            toast.error(`Error Authenticating with ${url.split('/')[2]}`);
-          },
-          onAuthSuccess: (url, auth) => {
-            saveGitAuth(url, auth);
-          },
-        });
+    console.log('remoteUrl: ', remoteUrl);
 
-        const data: Record<string, { data: any; encoding?: string }> = {};
+    if (!remoteUrl) {
+      throw 'No remote repository found';
+    }
 
-        for (const [key, value] of Object.entries(fileData.current)) {
-          data[key] = value;
-        }
+    const auth = lookupSavedPassword(remoteUrl);
 
-        return { workdir: webcontainer.workdir, data };
-      } catch (error) {
-        console.error('Error during git pull:', error);
-        throw error;
-      }
-    },
-    [webcontainer],
-  );
+    if (auth) {
+      headers.Authorization = `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString('base64')}`;
+    }
+
+    try {
+      await git.pull({
+        fs,
+        http,
+        dir: webcontainer.workdir,
+        singleBranch: true,
+        corsProxy: '/api/git-proxy',
+        headers,
+
+        onAuth: (url) => {
+          let auth = lookupSavedPassword(url);
+
+          if (auth) {
+            return auth;
+          }
+
+          if (confirm('This repo is password protected. Ready to enter a username & password?')) {
+            auth = {
+              username: prompt('Enter username'),
+              password: prompt('Enter password'),
+            };
+            return auth;
+          } else {
+            return { cancel: true };
+          }
+        },
+        onAuthFailure: (url, _auth) => {
+          toast.error(`Error Authenticating with ${url.split('/')[2]}`);
+        },
+        onAuthSuccess: (url, auth) => {
+          saveGitAuth(url, auth);
+        },
+      });
+
+      toast.success('Git pull successful');
+    } catch (error) {
+      console.error('Git pull error:', error);
+      throw error;
+    }
+  }, [webcontainer, fs, ready]);
 
   const gitReportIssue = useCallback(
     async (repoName: string, issueTitle: string, githubUsername?: string, ghToken?: string, issueBody?: string) => {

@@ -235,7 +235,7 @@ export async function updateChatDescription(db: IDBDatabase, id: string, descrip
   await setMessages(db, id, chat.messages, chat.urlId, description, chat.gitHubRepo, chat.timestamp);
 }
 
-export async function updateChatGitHubRepository(db: IDBDatabase, id: string): Promise<void> {
+export async function updateChatGitHubRepository(db: IDBDatabase, id: string): Promise<string | null> {
   const chat = await getMessages(db, id);
 
   if (!chat) {
@@ -247,11 +247,13 @@ export async function updateChatGitHubRepository(db: IDBDatabase, id: string): P
 
     if (!repoName) {
       alert('Repository name is required. Push to GitHub cancelled.');
-      return;
+      return null;
     }
 
     await setMessages(db, id, chat.messages, chat.urlId, chat.description, repoName, chat.timestamp);
+
+    return repoName;
   } else {
-    return;
+    return chat.gitHubRepo;
   }
 }
