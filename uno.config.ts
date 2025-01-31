@@ -21,6 +21,9 @@ const customIconCollection = iconPaths.reduce(
 
 const BASE_COLORS = {
   white: '#FFFFFF',
+  webrunch: {
+    500: '#B6794F',
+  },
   gray: {
     50: '#FAFAFA',
     100: '#F5F5F5',
@@ -98,9 +101,7 @@ const COLOR_PRIMITIVES = {
 };
 
 export default defineConfig({
-  safelist: [
-    ...Object.keys(customIconCollection[collectionName]||{}).map(x=>`i-bolt:${x}`)    
-  ],
+  safelist: [...Object.keys(customIconCollection[collectionName] || {}).map((x) => `i-bolt:${x}`)],
   shortcuts: {
     'bolt-ease-cubic-bezier': 'ease-[cubic-bezier(0.4,0,0.2,1)]',
     'transition-theme': 'transition-[background-color,border-color,color] duration-150 bolt-ease-cubic-bezier',
